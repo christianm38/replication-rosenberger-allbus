@@ -1,6 +1,6 @@
 # Erweiterte Replikation: Kriminalitätsfurcht und Medienkonsum — ALLBUS 2021
 
-Seminararbeit im Rahmen des Studiums (Empirische Forschungspraktikum 2).
+Seminararbeit im Rahmen des Studiums (Empirisches Forschungspraktikum 2).
 Autorinnen und Autoren: Adrianna Stelmach, Christian Mann, Feyza Dogan, Jennifer Scherer
 
 ---
