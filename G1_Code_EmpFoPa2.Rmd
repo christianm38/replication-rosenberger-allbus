@@ -1,0 +1,687 @@
+---
+title: "Kriminalitätsfurcht und Medienkonsum — ALLBUS 2021"
+author: "Adrianna Stelmach, Christian Mann, Feyza Dogar, Jennifer Scherer"
+date: "2026-01-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+if (!require(dplyr)) install.packages("dplyr")
+library(dplyr)
+if (!require(tinytex)) install.packages("tinytex")
+library(tinytex)
+if (!require(haven)) install.packages("haven")
+library(haven)
+if (!require(here)) install.packages("here")
+library(here)
+if (!require(table1)) install.packages("table1")
+library(table1)
+if (!require(kableExtra)) install.packages("kableExtra")
+library(kableExtra)
+if (!require(flextable))install.packages("flextable")
+library(flextable)
+if (!require(ltm))install.packages("ltm")
+library(ltm)
+if(!require(stargazer)) install.packages("stargazer")
+library(stargazer)
+if (!require(car)) install.packages("car")
+library(car)
+if (!require(chisq.posthoc.test)) install.packages("chisq.posthoc.test")
+library(chisq.posthoc.test)
+if (!require(ggplot2)) install.packages("ggplot2")
+library(ggplot2)
+if (!require(pscl)) install.packages("pscl")
+library(pscl)
+if (!require(marginaleffects)) install.packages("marginaleffects")
+library(marginaleffects)
+if (!require(MASS)) install.packages("MASS")
+library(MASS)
+if(!require(ggpubr)) install.packages("ggpubr")
+library(ggpubr)
+if(!require(modelr)) install.packages("modelr")
+library(modelr)
+if (!require(lmtest)) install.packages("lmtest")
+library(lmtest)
+if (!require(sandwich)) install.packages("sandwich")
+library(sandwich)
+if (!require(olsrr)) install.packages("olsrr")
+library(olsrr)
+if (!require(corrplot)) install.packages("corrplot")
+library(corrplot)
+if (!require(webshot2)) install.packages("webshot2")
+library(webshot2)
+if (!require(ggeffects)) install.packages("ggeffects")
+library(ggeffects)
+if (!require(psych)) install.packages("psych")
+library(psych)
+if (!require(tidycomm)) install.packages("tidycomm")
+library(tidycomm)
+
+```
+
+
+
+```{r Datensatz laden}
+
+allbus21r <- haven::read_dta(here("Daten/Datensatz2021/ZA5280_v2-0-1.dta"))
+allbus21r <- zap_labels(allbus21r)
+```
+
+
+
+```{r Kleineren Datensatz erstellen}
+
+allbus21p <- allbus21r %>%
+  dplyr::select(cf04:cf11, lm01, xr20, sex, dn07, ce02, age, gs01, fdm01, mdm01, incc, dh01, educ, eastwest) %>%
+  mutate(incc = if_else(incc == -50, 0, incc)) %>%
+  filter(sex %in% c(1, 2)) %>%
+  filter(if_all(everything(), ~ .x >= 0))
+```
+
+
+
+```{r Variablen rekodieren}
+
+# Rekodierung Internetkonsum: höherer Wert = höhere Nutzung
+allbus21p <- allbus21p %>%
+  mutate(xr20b = case_when(
+    xr20 == 1 ~ 5,
+    xr20 == 2 ~ 4,
+    xr20 == 3 ~ 3,
+    xr20 == 4 ~ 2,
+    xr20 == 5 ~ 1,
+    xr20 == 6 ~ 0,
+    .default = NA))
+
+# Rekodierung Wohnort: höherer Wert = höhere Bewohnerdichte
+allbus21p <- allbus21p %>%
+  mutate(gs01b = case_when(
+    gs01 == 1 ~ 5,
+    gs01 == 2 ~ 4,
+    gs01 == 3 ~ 3,
+    gs01 == 4 ~ 2,
+    gs01 == 5 ~ 1,
+    .default = NA))
+```
+
+
+
+```{r Variablen zu Kriminalitätsfurcht}
+
+allbus21p <- allbus21p %>%
+  mutate(
+    krimiangst1 = factor(case_when(cf04 == 1 ~ "Sehr sicher",
+                                   cf04 == 2 ~ "Eher sicher",
+                                   cf04 == 3 ~ "Eher unsicher",
+                                   cf04 == 4 ~ "Unsicher",
+                                   .default = NA),
+                         levels = c("Sehr sicher", "Eher sicher", "Eher unsicher", "Unsicher")),
+    krimiangst2 = factor(case_when(cf05 == 1 ~ "Gar nicht beunruhigt",
+                                   cf05 == 2 ~ "Etwas beunruhigt",
+                                   cf05 == 3 ~ "Ziemlich beunruhigt",
+                                   cf05 == 4 ~ "Sehr beunruhigt",
+                                   .default = NA),
+                         levels = c("Gar nicht beunruhigt", "Etwas beunruhigt", "Ziemlich beunruhigt", "Sehr beunruhigt")),
+    krimiangst3 = factor(case_when(cf06 == 1 ~ "Gar nicht beunruhigt",
+                                   cf06 == 2 ~ "Etwas beunruhigt",
+                                   cf06 == 3 ~ "Ziemlich beunruhigt",
+                                   cf06 == 4 ~ "Sehr beunruhigt",
+                                   .default = NA),
+                         levels = c("Gar nicht beunruhigt", "Etwas beunruhigt", "Ziemlich beunruhigt", "Sehr beunruhigt")),
+    krimiangst4 = factor(case_when(cf07 == 1 ~ "Gar nicht beunruhigt",
+                                   cf07 == 2 ~ "Etwas beunruhigt",
+                                   cf07 == 3 ~ "Ziemlich beunruhigt",
+                                   cf07 == 4 ~ "Sehr beunruhigt",
+                                   .default = NA),
+                         levels = c("Gar nicht beunruhigt", "Etwas beunruhigt", "Ziemlich beunruhigt", "Sehr beunruhigt")),
+    krimiangst5 = factor(case_when(cf08 == 1 ~ "Gar nicht beunruhigt",
+                                   cf08 == 2 ~ "Etwas beunruhigt",
+                                   cf08 == 3 ~ "Ziemlich beunruhigt",
+                                   cf08 == 4 ~ "Sehr beunruhigt",
+                                   .default = NA),
+                         levels = c("Gar nicht beunruhigt", "Etwas beunruhigt", "Ziemlich beunruhigt", "Sehr beunruhigt")),
+    krimiangst6 = factor(case_when(cf09 == 1 ~ "Gar nicht beunruhigt",
+                                   cf09 == 2 ~ "Etwas beunruhigt",
+                                   cf09 == 3 ~ "Ziemlich beunruhigt",
+                                   cf09 == 4 ~ "Sehr beunruhigt",
+                                   .default = NA),
+                         levels = c("Gar nicht beunruhigt", "Etwas beunruhigt", "Ziemlich beunruhigt", "Sehr beunruhigt")),
+    krimiangst7 = factor(case_when(cf10 == 1 ~ "Gar nicht beunruhigt",
+                                   cf10 == 2 ~ "Etwas beunruhigt",
+                                   cf10 == 3 ~ "Ziemlich beunruhigt",
+                                   cf10 == 4 ~ "Sehr beunruhigt",
+                                   .default = NA),
+                         levels = c("Gar nicht beunruhigt", "Etwas beunruhigt", "Ziemlich beunruhigt", "Sehr beunruhigt")),
+    krimiangst8 = factor(case_when(cf11 == 1 ~ "Gar nicht beunruhigt",
+                                   cf11 == 2 ~ "Etwas beunruhigt",
+                                   cf11 == 3 ~ "Ziemlich beunruhigt",
+                                   cf11 == 4 ~ "Sehr beunruhigt",
+                                   .default = NA),
+                         levels = c("Gar nicht beunruhigt", "Etwas beunruhigt", "Ziemlich beunruhigt", "Sehr beunruhigt")))
+```
+
+
+
+```{r Unabhängige Variablen}
+
+allbus21p <- allbus21p %>%
+  mutate(
+    fernsehen = factor(case_when(lm01 %in% c(0, 0.5) ~ "Selten oder Nie",
+                                 lm01 %in% c(1, 2, 3, 4, 5, 6) ~ "An 1 bis 6 Tagen",
+                                 lm01 %in% c(7) ~ "An 7 Tagen",
+                                 .default = NA),
+                       levels = c("Selten oder Nie", "An 1 bis 6 Tagen", "An 7 Tagen")),
+    internet = factor(case_when(xr20b %in% c(0, 1, 2, 3) ~ "Mehrmals wöchentlich oder weniger",
+                                xr20b %in% c(4, 5) ~ "Täglicher Konsum",
+                                .default = NA),
+                      levels = c("Mehrmals wöchentlich oder weniger", "Täglicher Konsum")),
+    geschlecht = factor(case_when(sex == 1 ~ "Mann",
+                                  sex == 2 ~ "Frau",
+                                  .default = NA),
+                        levels = c("Mann", "Frau")),
+    victim = factor(case_when(ce02 == 1 ~ "Opfer einer Straftat",
+                              ce02 == 2 ~ "Kein Opfer einer Straftat",
+                              .default = NA),
+                    levels = c("Opfer einer Straftat", "Kein Opfer einer Straftat")))
+```
+
+
+
+```{r Kontrollvariablen}
+
+allbus21p <- allbus21p %>%
+  mutate(
+    einkommen = factor(case_when(incc %in% c(0:8)    ~ "Unter 1000 Euro",
+                                 incc %in% c(9:12)   ~ "1000 Euro bis 1500 Euro",
+                                 incc %in% c(13, 14) ~ "1500 Euro bis 2000 Euro",
+                                 incc %in% c(15, 16) ~ "2000 Euro bis 2500 Euro",
+                                 incc %in% c(17, 18) ~ "2500 Euro bis 3000 Euro",
+                                 incc %in% c(19:26)  ~ "Mehr als 3000 Euro",
+                                 .default = NA),
+                       levels = c("Unter 1000 Euro", "1000 Euro bis 1500 Euro",
+                                  "1500 Euro bis 2000 Euro", "2000 Euro bis 2500 Euro",
+                                  "2500 Euro bis 3000 Euro", "Mehr als 3000 Euro")),
+    haushalt = factor(case_when(dh01 == 1 ~ "Mehrpersonenhaushalt",
+                                dh01 == 2 ~ "Einpersonenhaushalt",
+                                .default = NA),
+                      level = c("Einpersonenhaushalt", "Mehrpersonenhaushalt")),
+    ostwest = factor(case_when(eastwest == 1 ~ "Westen",
+                               eastwest == 2 ~ "Osten",
+                               .default = NA),
+                     level = c("Westen", "Osten")),
+    bildung = factor(case_when(educ == 1 ~ "Kein Abschluss",
+                               educ == 2 ~ "Hauptschulabschluss",
+                               educ == 3 ~ "Mittlere Reife",
+                               educ == 4 ~ "Fachhochschulreife",
+                               educ == 5 ~ "Abitur",
+                               .default = NA),
+                     level = c("Kein Abschluss", "Hauptschulabschluss",
+                               "Mittlere Reife", "Fachhochschulreife", "Abitur")),
+    geburtde = factor(case_when(dn07 == 1 ~ "In Deutschland geboren",
+                                dn07 == 2 ~ "Nicht in Deutschland geboren",
+                                .default = NA),
+                      levels = c("In Deutschland geboren", "Nicht in Deutschland geboren")),
+    age_kat = factor(case_when((age >= 18 & age <= 25) ~ "18 - 25 Jahre",
+                               (age >= 26 & age <= 35) ~ "26 - 35 Jahre",
+                               (age >= 36 & age <= 45) ~ "36 - 45 Jahre",
+                               (age >= 46 & age <= 55) ~ "46 - 55 Jahre",
+                               (age >= 55 & age <= 65) ~ "56 - 65 Jahre",
+                               (age >= 65)             ~ "65 Jahre oder älter",
+                               .default = NA),
+                     levels = c("18 - 25 Jahre", "26 - 35 Jahre", "36 - 45 Jahre",
+                                "46 - 55 Jahre", "56 - 65 Jahre", "65 Jahre oder älter")),
+    wohnort = factor(case_when(gs01b == 1 ~ "Alleinstehendes Haus",
+                               gs01b == 2 ~ "Ländliches Dorf",
+                               gs01b == 3 ~ "Mittel- oder Kleinstadt",
+                               gs01b == 4 ~ "Rand oder Vorort einer Großstadt",
+                               gs01b == 5 ~ "Großstadt",
+                               .default = NA),
+                     levels = c("Großstadt", "Rand oder Vorort einer Großstadt",
+                                "Mittel- oder Kleinstadt", "Ländliches Dorf",
+                                "Alleinstehendes Haus")))
+```
+
+
+
+```{r Migrationshintergrund}
+
+allbus21p <- allbus21p %>%
+  mutate(
+    herk_v = factor(case_when(fdm01 == 0 | fdm01 == 996 ~ "Geboren in Deutschland",
+                              fdm01 > 0 & fdm01 < 996   ~ "Geboren außerhalb von Deutschland",
+                              .default = NA),
+                    levels = c("Geboren in Deutschland", "Geboren außerhalb von Deutschland")),
+    herk_m = factor(case_when(mdm01 == 0 | mdm01 == 996 ~ "Geboren in Deutschland",
+                              mdm01 > 0 & mdm01 < 996   ~ "Geboren außerhalb von Deutschland",
+                              .default = NA),
+                    levels = c("Geboren in Deutschland", "Geboren außerhalb von Deutschland")))
+
+# Migrationshintergrund: dichotome Variable aus geburtde, herk_v, herk_m
+allbus21p <- allbus21p %>%
+  mutate(
+    mig_hintergrund = case_when(
+      geburtde == "Nicht in Deutschland geboren" |
+        herk_v == "Geboren außerhalb von Deutschland" |
+        herk_m == "Geboren außerhalb von Deutschland" ~ "MH",
+      geburtde == "In Deutschland geboren" &
+        herk_v == "Geboren in Deutschland" &
+        herk_m == "Geboren in Deutschland" ~ "Kein MH",
+      TRUE ~ NA_character_),
+    mig_hintergrund = factor(mig_hintergrund, levels = c("Kein MH", "MH")))
+```
+
+
+
+```{r Indexbildung Kriminalitätsfurcht}
+
+# Numerische Variablen für Indexberechnung
+allbus21p <- allbus21p %>%
+  mutate(across(krimiangst1:krimiangst8,
+                ~ as.numeric(.),
+                .names = "{.col}_num"))
+
+# Korrelationsmatrix
+png("Graphik2_korrelation_krimiangst.png", width = 2000, height = 2000, res = 300)
+allbus21p %>%
+  dplyr::select(krimiangst1_num:krimiangst8_num) %>%
+  cor(use = "complete.obs") %>%
+  corrplot()
+dev.off()
+
+# Screeplot
+png("Graphik1_screeplot_krimiangst.png", width = 2000, height = 2000, res = 300)
+psych::scree(allbus21p %>% dplyr::select(krimiangst1_num:krimiangst8_num),
+             factors = TRUE, pc = FALSE)
+dev.off()
+
+# Faktoranalyse (alle 8 Items)
+# → krimiangst1_num lädt unter 0.4 → wird aus Index ausgeschlossen
+factanal(~ krimiangst1_num + krimiangst2_num + krimiangst3_num + krimiangst4_num +
+           krimiangst5_num + krimiangst6_num + krimiangst7_num + krimiangst8_num,
+         factors = 1, data = allbus21p, rotation = "none")
+
+# Faktoranalyse ohne krimiangst1_num
+factanal(~ krimiangst2_num + krimiangst3_num + krimiangst4_num + krimiangst5_num +
+           krimiangst6_num + krimiangst7_num + krimiangst8_num,
+         factors = 1, data = allbus21p, rotation = "none")
+
+# Faktorscores berechnen
+krimiangst_fa <- factanal(
+  ~ krimiangst2_num + krimiangst3_num + krimiangst4_num + krimiangst5_num +
+    krimiangst6_num + krimiangst7_num + krimiangst8_num,
+  factors = 1, data = allbus21p, na.action = na.exclude, scores = "regression")
+
+allbus21p <- bind_cols(allbus21p, data.frame(krimiangst_fa$scores))
+
+# Mittelwertindex
+allbus21p <- allbus21p %>%
+  add_index(index_mean,
+            c(krimiangst2_num, krimiangst3_num, krimiangst4_num,
+              krimiangst5_num, krimiangst6_num, krimiangst7_num, krimiangst8_num),
+            type = "mean", na.rm = FALSE)
+
+# Interne Konsistenz
+krimiangst_data <- allbus21p %>% dplyr::select(krimiangst2_num:krimiangst8_num)
+cronbach.alpha(krimiangst_data)
+# Cronbach's α = 0.896 → gute interne Konsistenz
+```
+
+
+
+```{r Deskriptive Tabellen}
+
+label(allbus21p$index_mean)      <- "Kriminalitätsfurcht"
+label(allbus21p$fernsehen)       <- "Häufigkeit des Fernsehkonsums"
+label(allbus21p$internet)        <- "Häufigkeit der Internetnutzung"
+label(allbus21p$victim)          <- "Viktimisierungserfahrung in letzten 3 Jahren"
+label(allbus21p$geschlecht)      <- "Geschlecht"
+label(allbus21p$age)             <- "Alter (Jahre)"
+label(allbus21p$mig_hintergrund) <- "Migrationshintergrund"
+label(allbus21p$wohnort)         <- "Wohnortgröße"
+label(allbus21p$age_kat)         <- "Alter in Kategorien"
+label(allbus21p$bildung)         <- "Höchster Schulabschluss"
+label(allbus21p$einkommen)       <- "Nettoeinkommen"
+label(allbus21p$haushalt)        <- "Haushaltsgröße"
+label(allbus21p$ostwest)         <- "Ostdeutschland / Westdeutschland"
+
+# Tabelle 1: nach Viktimisierungserfahrung
+tab_mainvars_vic <- table1(
+  ~ index_mean + fernsehen + internet + geschlecht + mig_hintergrund | victim,
+  data = allbus21p,
+  render.categorical = "FREQ (PCTnoNA%)",
+  overall = "N (%)",
+  footnote = "Quelle: ALLBUS 2021",
+  caption = "Tabelle 1: Deskriptive Ergebnisse nach Viktimisierungserfahrung")
+
+t1flex(tab_mainvars_vic) %>%
+  save_as_image(path = here("tab1_mainvars_vic.png"))
+
+# Tabelle 2: nach Geschlecht und Migrationshintergrund
+tab_mainvars_mh <- table1(
+  ~ index_mean + fernsehen + internet + victim | geschlecht + mig_hintergrund,
+  data = allbus21p,
+  render.categorical = "FREQ (PCTnoNA%)",
+  overall = "N (%)",
+  footnote = "Quelle: ALLBUS 2021",
+  caption = "Tabelle 2: Deskriptive Ergebnisse nach Geschlecht und Migrationshintergrund")
+
+t1flex(tab_mainvars_mh) %>%
+  save_as_image(path = here("tab2_mainvars_mh_sex.png"))
+
+# Tabelle 3: Kontrollvariablen
+tab_kontrollvars <- table1(
+  ~ geschlecht + age + age_kat + mig_hintergrund + wohnort + bildung + einkommen + haushalt + ostwest,
+  data = allbus21p,
+  render.categorical = "FREQ (PCTnoNA%)",
+  overall = "N (%)",
+  footnote = "Quelle: ALLBUS 2021",
+  caption = "Tabelle 3: Kontrollvariablen")
+
+t1flex(tab_kontrollvars) %>%
+  save_as_image(path = here("tab3_kontrollvariablen.png"))
+```
+
+
+
+```{r Boxplots Medienkonsum nach Alter}
+
+boxplot_age_int <- ggplot(allbus21p %>% filter(!is.na(age) & !is.na(internet))) +
+  geom_boxplot(aes(x = internet, y = age, fill = internet)) +
+  labs(title = "Boxplot 1: Internetnutzung nach Alter", caption = "N = 2592") +
+  guides(fill = "none") +
+  coord_flip() +
+  theme_minimal()
+
+ggsave("boxplot_age_int.png", boxplot_age_int)
+
+boxplot_age_fern <- ggplot(allbus21p %>% filter(!is.na(age) & !is.na(fernsehen))) +
+  geom_boxplot(aes(x = fernsehen, y = age, fill = fernsehen)) +
+  labs(title = "Boxplot 2: Fernsehkonsum nach Alter", caption = "N = 2592") +
+  guides(fill = "none") +
+  coord_flip() +
+  theme_minimal()
+
+ggsave("boxplot_age_fern.png", boxplot_age_fern)
+```
+
+
+
+```{r Regressionsmodelle}
+
+# H1: Haupteffekte mit Kontrollvariablen
+H1 <- lm(index_mean ~ internet + fernsehen + victim + geschlecht + mig_hintergrund +
+            age + bildung + einkommen + wohnort + haushalt + ostwest,
+          data = allbus21p)
+
+H1s <- coeftest(H1, vcov = vcovHC(H1, type = "HC1"))
+
+# H2: Moderation durch Geschlecht und Migrationshintergrund
+H2a <- lm(index_mean ~ (internet + fernsehen) + geschlecht + mig_hintergrund +
+             internet:geschlecht + fernsehen:geschlecht, data = allbus21p)
+
+H2b <- lm(index_mean ~ (internet + fernsehen) + geschlecht + mig_hintergrund +
+             internet:mig_hintergrund + fernsehen:mig_hintergrund, data = allbus21p)
+
+H2c <- lm(index_mean ~ (internet + fernsehen) + geschlecht + mig_hintergrund +
+             internet:geschlecht:mig_hintergrund + fernsehen:geschlecht:mig_hintergrund,
+           data = allbus21p)
+
+H2aa <- coeftest(H2a, vcov = vcovHC(H2a, type = "HC1"))
+H2bb <- coeftest(H2b, vcov = vcovHC(H2b, type = "HC1"))
+H2cc <- coeftest(H2c, vcov = vcovHC(H2c, type = "HC1"))
+
+# H3: Moderation durch Viktimisierungserfahrung
+H3 <- lm(index_mean ~ internet + fernsehen + victim + geschlecht + mig_hintergrund +
+            age + bildung + einkommen + wohnort + haushalt + ostwest +
+            victim * internet + victim * fernsehen,
+          data = allbus21p)
+
+H3s <- coeftest(H3, vcov = vcovHC(H3, type = "HC1"))
+```
+
+
+
+```{r Annahmetests}
+
+# Linearität
+png("Graphik3_qq_age.png")
+qqnorm(allbus21p$age)
+qqline(allbus21p$age, col = "red")
+dev.off()
+
+png("Graphik4_qqjitter_age.png")
+ggplot(allbus21p) + geom_jitter(aes(x = age, y = index_mean))
+dev.off()
+
+# Autokorrelation: D-W = 1.97 → kein Problem
+durbinWatsonTest(H1)
+
+# Normalverteilung der Residuen
+allbus21p <- allbus21p %>% add_residuals(H1) %>% add_predictions(H1)
+
+png("Graphik5_normalvert_residuen.png")
+qqnorm(allbus21p$resid)
+qqline(allbus21p$resid, col = "red")
+dev.off()
+
+# Homoskedastizität: signifikant → robuste SE
+ols_test_breusch_pagan(H1)
+coeftest(H1, vcov = vcovHC(H1, type = "HC1"))
+
+# Multikollinearität: alle VIF < 5
+car::vif(H1)
+```
+
+
+
+```{r Regressionstabelle H1}
+
+stargazer(H1s, type = "html", out = "H1mitlabel.html",
+  title = "Lineare Regressionen zu Hypothese 1",
+  digits = 3,
+  star.cutoffs = c(0.05, 0.01, 0.001),
+  covariate.labels = c(
+    "Täglicher Konsum", "1 bis 6 Tage", "7 Tage",
+    "Kein Opfer einer Straftat",
+    "Geschlecht: Weiblich", "Migrationshintergrund",
+    "Alter",
+    "Hauptschulabschluss", "Mittlere Reife", "Fachhochschulreife", "Abitur",
+    "Einkommen: 1000€ - 1500€", "Einkommen: 1500€ - 2000€",
+    "Einkommen: 2000€ - 2500€", "Einkommen: 2500€ - 3500€", "Einkommen: Mehr als 3000€",
+    "Rand/Vorort einer Großstadt", "Mittel- oder Kleinstadt",
+    "Ländliches Dorf", "Alleinstehendes Haus",
+    "Haushalt: Mehrpersonenhaushalt", "Ostdeutschland"),
+  keep.stat = c("n", "rsq", "adj.rsq"),
+  dep.var.caption = "",
+  dep.var.labels = "Kriminalitätsfurcht",
+  notes.align = "l",
+  single.row = TRUE,
+  header = FALSE)
+
+# Zwischenüberschriften einfügen (erfordert Google Chrome)
+x <- readLines("H1mitlabel.html", encoding = "UTF-8")
+
+insert_header_before <- function(lines, before_label, header_text, ncols = 2) {
+  header_row <- paste0(
+    '<tr class="group-header"><td colspan="', ncols,
+    '" style="font-weight:bold; text-align:left; padding-top:8px; padding-bottom:4px;">',
+    header_text, '</td></tr>')
+  idx <- grep(before_label, lines, fixed = TRUE)
+  if (length(idx) == 0) return(lines)
+  append(lines, header_row, after = idx[1] - 1)
+}
+
+ncols <- 2
+x <- insert_header_before(x, "Täglicher Konsum",          "Mediennutzung: Internet — Referenz: Mehrmals wöchentlich oder weniger", ncols)
+x <- insert_header_before(x, "1 bis 6 Tage",              "Mediennutzung: Fernsehen — Referenz: Selten oder nie", ncols)
+x <- insert_header_before(x, "Kein Opfer einer Straftat", "Viktimisierungserfahrung — Referenz: Opfer einer Straftat", ncols)
+x <- insert_header_before(x, "Geschlecht: Weiblich",      "Persönliche Informationen — Referenz: Männlich, kein Migrationshintergrund", ncols)
+x <- insert_header_before(x, "Alter",                     "Alter", ncols)
+x <- insert_header_before(x, "Hauptschulabschluss",       "Bildung — Referenz: Kein Abschluss", ncols)
+x <- insert_header_before(x, "Einkommen: 1000€ - 1500€",  "Einkommen — Referenz: Kein Einkommen", ncols)
+x <- insert_header_before(x, "Rand/Vorort einer Großstadt","Wohnort — Referenz: Großstadt", ncols)
+x <- insert_header_before(x, "Mehrpersonenhaushalt",      "Haushalt — Referenz: Einpersonenhaushalt", ncols)
+x <- insert_header_before(x, "Ostdeutschland",            "Region — Referenz: Westdeutschland", ncols)
+
+x <- gsub("border-top: 1px solid black; ?", "", x)
+x <- gsub("border-top:1px solid black; ?",  "", x)
+
+writeLines(x, "H1.html", useBytes = TRUE)
+webshot(url = paste0("file:///", normalizePath("H1.html", winslash = "/")),
+        file = "H1.png", zoom = 2, vwidth = 1200)
+```
+
+
+
+```{r Regressionstabelle H2}
+
+stargazer(H2aa, H2bb, H2cc, type = "html", out = "H2mitlabel.html",
+  title = "Lineare Regressionen zu Hypothese 2",
+  digits = 3,
+  column.labels = c("Interaktion: Medien und Geschlecht",
+                    "Interaktion: Medien und Migrationshintergrund",
+                    "Interaktion: Medien, Geschlecht und Migrationshintergrund"),
+  star.cutoffs = c(0.05, 0.01, 0.001),
+  covariate.labels = c(
+    "Täglicher Konsum", "1 bis 6 Tage", "7 Tage",
+    "Geschlecht: Weiblich", "Migrationshintergrund",
+    "Täglicher Konsum, weiblich", "1 bis 6 Tage, weiblich", "7 Tage, weiblich",
+    "Täglicher Konsum, mit Migrationshintergrund",
+    "1 bis 6 Tage, mit Migrationshintergrund",
+    "7 Tage, mit Migrationshintergrund",
+    "Mehrmals wöchentlich oder weniger, männlich, kein Migrationshintergrund",
+    "Täglicher Konsum, männlich, kein Migrationshintergrund",
+    "Mehrmals wöchentlich oder weniger, weiblich, kein Migrationshintergrund",
+    "Mehrmals wöchentlich oder weniger, männlich, mit Migrationshintergrund",
+    "1 bis 6 Tage, männlich, kein Migrationshintergrund",
+    "7 Tage, männlich, kein Migrationshintergrund",
+    "1 bis 6 Tage, weiblich, kein Migrationshintergrund",
+    "7 Tage, weiblich, kein Migrationshintergrund",
+    "1 bis 6 Tage, männlich, mit Migrationshintergrund",
+    "7 Tage, männlich, mit Migrationshintergrund"),
+  dep.var.caption = "",
+  dep.var.labels = "Kriminalitätsfurcht",
+  keep.stat = c("n", "rsq", "adj.rsq"),
+  notes.align = "l",
+  single.row = TRUE,
+  header = FALSE)
+
+x <- readLines("H2mitlabel.html", encoding = "UTF-8")
+ncols <- 2
+x <- insert_header_before(x, "Täglicher Konsum",           "Mediennutzung: Internet — Referenz: Mehrmals wöchentlich oder weniger", ncols)
+x <- insert_header_before(x, "1 bis 6 Tage",               "Mediennutzung: Fernsehen — Referenz: Selten oder nie", ncols)
+x <- insert_header_before(x, "Geschlecht: Weiblich",       "Persönliche Informationen — Referenz: Männlich, kein Migrationshintergrund", ncols)
+x <- insert_header_before(x, "Täglicher Konsum, weiblich", "Interaktion: Medien und Geschlecht", ncols)
+x <- insert_header_before(x, "Täglicher Konsum, mit Migrationshintergrund", "Interaktion: Medien und Migrationshintergrund", ncols)
+x <- insert_header_before(x, "Mehrmals wöchentlich oder weniger, männlich, kein Migrationshintergrund",
+                           "Interaktion: Internet, Geschlecht und Migrationshintergrund", ncols)
+x <- insert_header_before(x, "1 bis 6 Tage, männlich, kein Migrationshintergrund",
+                           "Interaktion: Fernsehen, Geschlecht und Migrationshintergrund", ncols)
+
+x <- gsub("border-top: 1px solid black; ?", "", x)
+x <- gsub("border-top:1px solid black; ?",  "", x)
+
+writeLines(x, "H2.html", useBytes = TRUE)
+webshot(url = paste0("file:///", normalizePath("H2.html", winslash = "/")),
+        file = "H2.png", zoom = 2, vwidth = 1200)
+```
+
+
+
+```{r Regressionstabelle H3}
+
+stargazer(H3s, type = "html", out = "H3mitlabel.html",
+  title = "Lineare Regressionen Hypothese 3",
+  digits = 3,
+  star.cutoffs = c(0.05, 0.01, 0.001),
+  covariate.labels = c(
+    "Täglicher Konsum", "1 bis 6 Tage", "7 Tage",
+    "Kein Opfer einer Straftat",
+    "Geschlecht: Weiblich", "Migrationshintergrund",
+    "Alter",
+    "Hauptschulabschluss", "Mittlere Reife", "Fachhochschulreife", "Abitur",
+    "Einkommen: 1000€ - 1500€", "Einkommen: 1500€ - 2000€",
+    "Einkommen: 2000€ - 2500€", "Einkommen: 2500€ - 3500€", "Einkommen: Mehr als 3000€",
+    "Rand/Vorort einer Großstadt", "Mittel- oder Kleinstadt",
+    "Ländliches Dorf", "Alleinstehendes Haus",
+    "Haushalt: Mehrpersonenhaushalt", "Ostdeutschland",
+    "Täglicher Konsum, keine Viktimisierungserfahrung",
+    "1 bis 6 Tage, keine Viktimisierungserfahrung",
+    "7 Tage, keine Viktimisierungserfahrung"),
+  dep.var.caption = "",
+  dep.var.labels = "Kriminalitätsfurcht",
+  keep.stat = c("n", "rsq", "adj.rsq"),
+  notes.align = "l",
+  single.row = TRUE,
+  header = FALSE)
+
+x <- readLines("H3mitlabel.html", encoding = "UTF-8")
+ncols <- 2
+x <- insert_header_before(x, "Täglicher Konsum",          "Mediennutzung: Internet — Referenz: Mehrmals wöchentlich oder weniger", ncols)
+x <- insert_header_before(x, "1 bis 6 Tage",              "Mediennutzung: Fernsehen — Referenz: Selten oder nie", ncols)
+x <- insert_header_before(x, "Kein Opfer einer Straftat", "Viktimisierungserfahrung — Referenz: Opfer einer Straftat", ncols)
+x <- insert_header_before(x, "Geschlecht: Weiblich",      "Persönliche Informationen — Referenz: Männlich, kein Migrationshintergrund", ncols)
+x <- insert_header_before(x, "Alter",                     "Alter", ncols)
+x <- insert_header_before(x, "Hauptschulabschluss",       "Bildung — Referenz: Kein Abschluss", ncols)
+x <- insert_header_before(x, "Einkommen: 1000€ - 1500€",  "Einkommen — Referenz: Kein Einkommen", ncols)
+x <- insert_header_before(x, "Rand/Vorort einer Großstadt","Wohnort — Referenz: Großstadt", ncols)
+x <- insert_header_before(x, "Mehrpersonenhaushalt",      "Haushalt — Referenz: Einpersonenhaushalt", ncols)
+x <- insert_header_before(x, "Ostdeutschland",            "Region — Referenz: Westdeutschland", ncols)
+x <- insert_header_before(x, "Täglicher Konsum, keine Viktimisierungserfahrung",
+                           "Interaktion: Internet und Viktimisierungserfahrung", ncols)
+x <- insert_header_before(x, "1 bis 6 Tage, keine Viktimisierungserfahrung",
+                           "Interaktion: Fernsehen und Viktimisierungserfahrung", ncols)
+
+x <- gsub("border-top: 1px solid black; ?", "", x)
+x <- gsub("border-top:1px solid black; ?",  "", x)
+
+writeLines(x, "H3.html", useBytes = TRUE)
+webshot(url = paste0("file:///", normalizePath("H3.html", winslash = "/")),
+        file = "H3.png", zoom = 2, vwidth = 1200)
+```
+
+
+
+```{r Interaktionsplots H3}
+
+# Fernsehen × Viktimisierung
+pred_tv_victim <- predictions(H3,
+  newdata = datagrid(fernsehen = levels(H3$model$fernsehen),
+                     victim    = levels(H3$model$victim))) %>%
+  mutate(fernsehen = factor(fernsehen, levels = c("Selten oder Nie", "An 1 bis 6 Tagen", "An 7 Tagen")),
+         victim    = factor(victim,    levels = c("Opfer einer Straftat", "Kein Opfer einer Straftat")))
+
+plot_h3_tv <- ggplot(pred_tv_victim,
+  aes(x = fernsehen, y = estimate, ymin = conf.low, ymax = conf.high, color = victim)) +
+  geom_pointrange(position = position_dodge(width = 0.5), size = 0.9) +
+  labs(x = "Fernsehkonsum", y = "Vorhergesagte Kriminalitätsfurcht (Index)",
+       color = "Viktimisierungsstatus",
+       title = "Graphik 6: Fernsehkonsum und Kriminalitätsfurcht nach Viktimisierung",
+       subtitle = "Marginale Vorhersagen aus Regression H3 (95%-Konfidenzintervalle)") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top", panel.grid.minor = element_blank())
+
+ggsave("Graphik6_FernsehenVictim.png", plot_h3_tv, width = 18, height = 14, units = "cm", dpi = 300)
+
+# Internet × Viktimisierung
+pred_int_victim <- predictions(H3,
+  newdata = datagrid(internet = levels(H3$model$internet),
+                     victim   = levels(H3$model$victim))) %>%
+  mutate(internet = factor(internet, levels = c("Mehrmals wöchentlich oder weniger", "Täglicher Konsum")),
+         victim   = factor(victim,   levels = c("Opfer einer Straftat", "Kein Opfer einer Straftat")))
+
+plot_h3_int <- ggplot(pred_int_victim,
+  aes(x = internet, y = estimate, ymin = conf.low, ymax = conf.high, color = victim)) +
+  geom_pointrange(position = position_dodge(width = 0.5), size = 0.9) +
+  labs(x = "Internetkonsum", y = "Vorhergesagte Kriminalitätsfurcht (Index)",
+       color = "Viktimisierungsstatus",
+       title = "Graphik 7: Internetkonsum und Kriminalitätsfurcht nach Viktimisierung",
+       subtitle = "Marginale Vorhersagen aus Regression H3 (95%-Konfidenzintervalle)") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top", panel.grid.minor = element_blank())
+
+ggsave("Graphik7_InternetVictim.png", plot_h3_int, width = 18, height = 14, units = "cm", dpi = 300)
+```
